@@ -1,36 +1,35 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document } from "mongoose";
 
 export interface IUser extends Document {
-  role: 'customer' | 'vendor';
-  name: string;
   email: string;
-  passwordHash: string;
-  createdAt: Date;
-  updatedAt: Date;
+  password: string;
+  role: "vendor" | "customer";
+  vendorProfile?: mongoose.Types.ObjectId;
+  customerProfile?: mongoose.Types.ObjectId;
 }
 
-const UserSchema = new Schema<IUser>({
-  role: {
-    type: String,
-    enum: ['customer', 'vendor'],
-    required: true
+const UserSchema = new Schema<IUser>(
+  {
+    email: { type: String, required: true, unique: true },
+    password: { type: String, required: true, select: false },
+    role: {
+      type: String,
+      enum: ["vendor", "customer"],
+      required: true,
+      default: "customer",
+    },
+    vendorProfile: {
+      type: Schema.Types.ObjectId,
+      ref: "VendorProfile",
+      default: null,
+    },
+    customerProfile: {
+      type: Schema.Types.ObjectId,
+      ref: "CustomerProfile",
+      default: null,
+    },
   },
-  name: {
-    type: String,
-    required: true
-  },
-  email: {
-    type: String,
-    required: true,
-    unique: true,
-    lowercase: true
-  },
-  passwordHash: {
-    type: String,
-    required: true
-  }
-}, {
-  timestamps: true
-});
+  { timestamps: true }
+);
 
-export default mongoose.model<IUser>('User', UserSchema);
+export default mongoose.model<IUser>("User", UserSchema);

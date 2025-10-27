@@ -1,77 +1,45 @@
-import axios from 'axios';
-
-const API_BASE_URL = 'http://localhost:5000/api';
+import axios from "axios";
 
 const api = axios.create({
-  baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: import.meta.env.VITE_API_URL || "http://localhost:5000/api",
 });
 
-// Add token to requests
+// ✅ Attach token automatically
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
+  const token = localStorage.getItem("token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// Auth API
+// ✅ Auth API
 export const authAPI = {
-  login: async (email: string, password: string) => {
-    const { data } = await api.post('/auth/login', { email, password });
-    return data;
-  },
-  register: async (name: string, email: string, password: string, role: 'customer' | 'vendor') => {
-    const { data } = await api.post('/auth/register', { name, email, password, role });
-    return data;
-  },
-  getMe: async () => {
-    const { data } = await api.get('/auth/me');
-    return data;
-  },
+  login: async (email: string, password: string) =>
+    (await api.post("/auth/login", { email, password })).data,
+
+  me: async () => (await api.get("/auth/me")).data,
 };
 
-// Products API
+// ✅ Products API
 export const productsAPI = {
-  getAll: async (params?: any) => {
-    const { data } = await api.get('/products', { params });
-    return data;
-  },
-  getVendorProducts: async () => {
-    const { data } = await api.get('/products/vendor');
-    return data;
-  },
-  create: async (product: any) => {
-    const { data } = await api.post('/products', product);
-    return data;
-  },
-  update: async (id: string, product: any) => {
-    const { data } = await api.put(`/products/${id}`, product);
-    return data;
-  },
-  delete: async (id: string) => {
-    const { data } = await api.delete(`/products/${id}`);
-    return data;
-  },
+  getVendorProducts: async () =>
+    (await api.get("/products/vendor")).data,
+  getAll: async (params?: any) => (await api.get('/products', { params })).data,
+  create: async (data: any) =>
+    (await api.post("/products", data)).data,
+  update: async (id: string, data: any) =>
+    (await api.put(`/products/${id}`, data)).data,
+  delete: async (id: string) =>
+    (await api.delete(`/products/${id}`)).data,
+};
+// ✅ Orders API (temporary mock implementation)
+// src/lib/api.ts  — orders section
+// --- Orders API ---
+export const ordersAPI = {
+  getMy: async () => (await api.get('/orders/me')).data,
+  create: async (payload: any) => (await api.post('/orders', payload)).data,
+  // (optional helpers)
+  getMyOrders: async () => (await api.get('/orders/me')).data,
 };
 
-// Orders API
-export const ordersAPI = {
-  create: async (order: any) => {
-    const { data } = await api.post('/orders', order);
-    return data;
-  },
-  pay: async (orderId: string) => {
-    const { data } = await api.post(`/orders/${orderId}/pay`);
-    return data;
-  },
-  getMy: async () => {
-    const { data } = await api.get('/orders/my');
-    return data;
-  },
-};
 
 export default api;

@@ -9,6 +9,9 @@ import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react';
 const Cart = () => {
   const { items, removeFromCart, updateQuantity, subtotal } = useCart();
   const navigate = useNavigate();
+
+  const safeQty = (q: number) => (Number.isFinite(q) && q > 0 ? Math.floor(q) : 1);
+
   const taxes = subtotal * 0.18; // 18% GST
   const total = subtotal + taxes;
 
@@ -51,7 +54,9 @@ const Cart = () => {
                       <div>
                         <h3 className="font-semibold text-foreground">{item.name}</h3>
                         <p className="text-sm text-muted-foreground">{item.brand}</p>
-                        <p className="text-xs text-muted-foreground">by {item.vendorName}</p>
+                        {item.vendorName && (
+                          <p className="text-xs text-muted-foreground">by {item.vendorName}</p>
+                        )}
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -59,7 +64,11 @@ const Cart = () => {
                             variant="outline"
                             size="icon"
                             className="h-8 w-8"
-                            onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                            onClick={() =>
+                              updateQuantity(item.productId, safeQty(item.quantity - 1))
+                            }
+                            disabled={item.quantity <= 1}
+                            title={item.quantity <= 1 ? 'Minimum quantity is 1' : 'Decrease'}
                           >
                             <Minus className="h-3 w-3" />
                           </Button>
@@ -67,14 +76,19 @@ const Cart = () => {
                             type="number"
                             min="1"
                             value={item.quantity}
-                            onChange={(e) => updateQuantity(item.productId, parseInt(e.target.value) || 1)}
+                            onChange={(e) =>
+                              updateQuantity(item.productId, safeQty(parseInt(e.target.value)))
+                            }
                             className="w-16 h-8 text-center"
                           />
                           <Button
                             variant="outline"
                             size="icon"
                             className="h-8 w-8"
-                            onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                            onClick={() =>
+                              updateQuantity(item.productId, safeQty(item.quantity + 1))
+                            }
+                            title="Increase"
                           >
                             <Plus className="h-3 w-3" />
                           </Button>
@@ -83,6 +97,7 @@ const Cart = () => {
                           variant="ghost"
                           size="icon"
                           onClick={() => removeFromCart(item.productId)}
+                          title="Remove item"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>

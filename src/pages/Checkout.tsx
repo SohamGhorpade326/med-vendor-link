@@ -10,29 +10,32 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle, XCircle } from 'lucide-react';
+import { ordersAPI } from '@/lib/api';
 
 const Checkout = () => {
   const { items, subtotal, clearCart } = useCart();
-  const { customerProfile } = useAuth();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
-  const [address, setAddress] = useState(customerProfile?.addresses[0] || {
-    label: 'Home',
-    line1: '',
-    line2: '',
-    city: '',
-    state: '',
-    zip: '',
-  });
-  
+
+  const [address, setAddress] = useState(
+    (user?.role === 'customer' && (user as any)?.profile?.addresses?.[0]) || {
+      label: 'Home',
+      line1: '',
+      line2: '',
+      city: '',
+      state: '',
+      zip: '',
+    }
+  );
+
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState<boolean | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const taxes = subtotal * 0.18;
   const total = subtotal + taxes;
-  const requiresPrescription = items.some(item => item.requiresPrescription);
+  const requiresPrescription = items.some((item) => item.requiresPrescription);
 
   const handleCheckout = () => {
     if (!address.line1 || !address.city || !address.state || !address.zip) {
@@ -43,27 +46,85 @@ const Checkout = () => {
       });
       return;
     }
+    if (!user) {
+      toast({
+        title: 'Login required',
+        description: 'Please login to place an order.',
+        variant: 'destructive',
+      });
+      return;
+    }
     setShowPaymentModal(true);
   };
 
-  const simulatePayment = () => {
-    setIsProcessing(true);
-    setTimeout(() => {
-      const success = Math.random() > 0.2; // 80% success rate
+  // Build payload exactly as backend expects
+  const buildOrderPayload = () => {
+    const vendorId = (items[0] as any)?.vendorId || (items[0] as any)?.vendor; // prefer vendorId
+
+    if (!vendorId) {
+      throw new Error(
+        'Missing vendor id on cart item. Ensure ProductCard adds vendorId from product.vendor when adding to cart.'
+      );
+    }
+
+    return {
+      vendor: vendorId,                 // ✅ top-level vendor
+      subtotal,                         // ✅ top-level numbers
+      taxes,
+      total,
+      items: items.map((it) => ({
+        product: it.productId,          // ✅ items[].product (ObjectId string)
+        name: it.name,
+        brand: (it as any).brand,       // ✅ items[].brand
+        price: it.price,
+        quantity: it.quantity,
+      })),
+      shippingAddress: {
+        line1: address.line1,
+        line2: address.line2,
+        city: address.city,
+        state: address.state,
+        zip: address.zip,
+        label: address.label || 'Home',
+      },
+      requiresPrescription,
+    };
+  };
+
+  const simulatePayment = async () => {
+    try {
+      setIsProcessing(true);
+      // payment simulation
+      await new Promise((r) => setTimeout(r, 1100));
+      const success = Math.random() > 0.2; // 80% success
       setPaymentSuccess(success);
-      setIsProcessing(false);
-      
-      if (success) {
-        setTimeout(() => {
-          clearCart();
-          navigate('/orders');
-          toast({
-            title: 'Order placed successfully!',
-            description: 'Your order has been confirmed',
-          });
-        }, 2000);
+
+      if (!success) {
+        setIsProcessing(false);
+        return;
       }
-    }, 2000);
+
+      // create the order
+      const payload = buildOrderPayload();
+      await ordersAPI.create(payload);
+
+      await new Promise((r) => setTimeout(r, 600));
+      clearCart();
+      setIsProcessing(false);
+      toast({
+        title: 'Order placed successfully!',
+        description: 'Your order has been confirmed',
+      });
+      navigate('/orders');
+    } catch (err: any) {
+      setIsProcessing(false);
+      setPaymentSuccess(false);
+      toast({
+        title: 'Order failed',
+        description: err?.message || err?.response?.data?.error || 'Could not place the order',
+        variant: 'destructive',
+      });
+    }
   };
 
   return (
@@ -164,11 +225,11 @@ const Checkout = () => {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">GST (18%)</span>
-                    <span className="font-medium">₹{taxes.toFixed(2)}</span>
+                    <span className="font-medium">₹{(subtotal * 0.18).toFixed(2)}</span>
                   </div>
                   <div className="border-t pt-2 flex justify-between text-base">
                     <span className="font-semibold">Total</span>
-                    <span className="font-bold text-primary text-xl">₹{total.toFixed(2)}</span>
+                    <span className="font-bold text-primary text-xl">₹{(subtotal * 1.18).toFixed(2)}</span>
                   </div>
                 </div>
                 <Button className="w-full" size="lg" onClick={handleCheckout}>
@@ -188,23 +249,19 @@ const Checkout = () => {
               {isProcessing ? 'Processing your payment...' : 'Complete your payment'}
             </DialogDescription>
           </DialogHeader>
-          
+
           {paymentSuccess === null && (
             <div className="space-y-4">
               <div className="bg-accent p-4 rounded-lg text-center">
-                <p className="text-2xl font-bold text-primary">₹{total.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-primary">₹{(subtotal * 1.18).toFixed(2)}</p>
                 <p className="text-sm text-muted-foreground mt-1">Total Amount</p>
               </div>
-              <Button
-                className="w-full"
-                onClick={simulatePayment}
-                disabled={isProcessing}
-              >
+              <Button className="w-full" onClick={simulatePayment} disabled={isProcessing}>
                 {isProcessing ? 'Processing...' : 'Pay Now (Demo)'}
               </Button>
             </div>
           )}
-          
+
           {paymentSuccess === true && (
             <div className="text-center py-6 space-y-4">
               <CheckCircle className="w-16 h-16 text-success mx-auto" />
@@ -214,7 +271,7 @@ const Checkout = () => {
               </div>
             </div>
           )}
-          
+
           {paymentSuccess === false && (
             <div className="text-center py-6 space-y-4">
               <XCircle className="w-16 h-16 text-destructive mx-auto" />

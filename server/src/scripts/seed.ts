@@ -26,7 +26,7 @@ const seedData = async () => {
       role: 'vendor',
       name: 'MediCare Pharmacy',
       email: 'vendor@medihub.com',
-      passwordHash: vendorPasswordHash
+      password: vendorPasswordHash
     });
 
     const vendorProfile = await VendorProfile.create({
@@ -43,7 +43,7 @@ const seedData = async () => {
       role: 'customer',
       name: 'John Doe',
       email: 'customer@medihub.com',
-      passwordHash: customerPasswordHash
+      password: customerPasswordHash
     });
 
     await CustomerProfile.create({

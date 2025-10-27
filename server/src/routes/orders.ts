@@ -6,6 +6,6 @@ const router = express.Router();
 
 router.post('/', authenticate, requireRole('customer'), createOrder);
 router.post('/:id/pay', authenticate, requireRole('customer'), payOrder);
-router.get('/my', authenticate, requireRole('customer'), getMyOrders);
+router.get('/me', authenticate, requireRole('customer'), getMyOrders);
 
 export default router;

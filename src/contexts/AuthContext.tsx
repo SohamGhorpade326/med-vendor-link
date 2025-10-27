@@ -1,74 +1,53 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, VendorProfile, CustomerProfile } from '@/types';
-import { mockVendor, mockCustomer, mockVendorProfile, mockCustomerProfile } from '@/lib/mockData';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import { authAPI } from "@/lib/api";
 
 interface AuthContextType {
-  user: User | null;
-  profile: VendorProfile | CustomerProfile | null;
-  vendorProfile: VendorProfile | null;
-  customerProfile: CustomerProfile | null;
+  user: any;
+  isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
-  isLoading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth must be used within AuthProvider');
-  }
-  return context;
+  const ctx = useContext(AuthContext);
+  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
+  return ctx;
 };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [vendorProfile, setVendorProfile] = useState<VendorProfile | null>(null);
-  const [customerProfile, setCustomerProfile] = useState<CustomerProfile | null>(null);
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+  const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  // ✅ Restore login session
   useEffect(() => {
-    const storedUser = localStorage.getItem('medihub_user');
-    if (storedUser) {
-      const parsedUser = JSON.parse(storedUser);
-      setUser(parsedUser);
-      
-      if (parsedUser.role === 'vendor') {
-        setVendorProfile(mockVendorProfile);
-      } else {
-        setCustomerProfile(mockCustomerProfile);
-      }
+    const token = localStorage.getItem("token");
+    const savedUser = localStorage.getItem("medihub_user");
+
+    if (token && savedUser) {
+      setUser(JSON.parse(savedUser));
     }
     setIsLoading(false);
   }, []);
 
+  // ✅ Login using backend API
   const login = async (email: string, password: string) => {
-    // Mock authentication
-    if (email === 'vendor@medihub.com' && password === 'Vendor@123') {
-      setUser(mockVendor);
-      setVendorProfile(mockVendorProfile);
-      localStorage.setItem('medihub_user', JSON.stringify(mockVendor));
-    } else if (email === 'customer@medihub.com' && password === 'Customer@123') {
-      setUser(mockCustomer);
-      setCustomerProfile(mockCustomerProfile);
-      localStorage.setItem('medihub_user', JSON.stringify(mockCustomer));
-    } else {
-      throw new Error('Invalid credentials');
-    }
+    const data = await authAPI.login(email, password);
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("medihub_user", JSON.stringify(data.user));
+    setUser(data.user);
   };
 
+  // ✅ Logout
   const logout = () => {
     setUser(null);
-    setVendorProfile(null);
-    setCustomerProfile(null);
-    localStorage.removeItem('medihub_user');
+    localStorage.removeItem("token");
+    localStorage.removeItem("medihub_user");
   };
 
-  const profile = vendorProfile || customerProfile;
-
   return (
-    <AuthContext.Provider value={{ user, profile, vendorProfile, customerProfile, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
       {children}
     </AuthContext.Provider>
   );

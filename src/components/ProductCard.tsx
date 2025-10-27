@@ -17,6 +17,12 @@ const ProductCard = ({ product }: ProductCardProps) => {
   const { toast } = useToast();
   const isLowStock = product.quantity < product.lowStockThreshold;
 
+const vendorId =
+  (product as any)?.vendor?._id ||   // populated vendor
+  (product as any)?.vendor ||        // raw ObjectId string
+  (product as any)?.vendorProfile || // if schema used vendorProfile
+  (product as any)?.vendorId ||      // just in case
+  null;
   const handleAddToCart = () => {
     if (product.quantity === 0) {
       toast({
@@ -28,15 +34,15 @@ const ProductCard = ({ product }: ProductCardProps) => {
     }
 
     addToCart({
-      productId: product.id,
-      name: product.name,
-      brand: product.brand,
-      price: product.price,
-      quantity: 1,
-      imageUrl: product.imageUrl,
-      vendorId: product.vendorId,
-      vendorName: product.vendorName,
-      requiresPrescription: product.requiresPrescription,
+      productId: product._id || product.id,
+  name: product.name,
+  brand: product.brand,            // ✅ include brand
+  price: product.price,
+  quantity: 1,
+  imageUrl: product.imageUrl,
+  requiresPrescription: product.requiresPrescription,
+  vendorName: product.vendorName,  // if you show it
+  vendorId
     });
 
     toast({

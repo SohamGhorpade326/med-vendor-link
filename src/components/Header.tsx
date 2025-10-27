@@ -7,7 +7,10 @@ import { useNavigate } from 'react-router-dom';
 
 const Header = () => {
   const { user, logout } = useAuth();
-  const { itemCount } = useCart();
+  // Header.tsx
+const { items } = useCart();
+const itemCount = items.reduce((sum, it) => sum + (it.quantity || 0), 0);
+
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -60,6 +63,17 @@ const Header = () => {
               Logout
             </Button>
           )}
+          {user?.role === 'customer' && (
+  <Button
+    variant="outline"
+    size="sm"
+    className="mr-2"
+    onClick={() => navigate('/orders')}
+  >
+    My Orders
+  </Button>
+)}
+
         </div>
       </div>
     </header>

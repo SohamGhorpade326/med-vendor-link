@@ -1,127 +1,85 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useEffect, useState } from 'react';
 import Header from '@/components/Header';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Package, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { ordersAPI } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Orders = () => {
-  const { user } = useAuth();
+  const { user } = useAuth(); // <-- don't take customerProfile; use user?.profile if needed
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const data = await ordersAPI.getMy();
-        setOrders(data);
-      } catch (error) {
-        console.error('Failed to fetch orders:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchOrders = async () => {
+    try {
+      const data = await ordersAPI.getMy();
+      setOrders(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to fetch orders:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchOrders();
   }, []);
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return <CheckCircle className="w-5 h-5" />;
-      case 'shipped':
-      case 'processing':
-        return <Package className="w-5 h-5" />;
-      default:
-        return <Clock className="w-5 h-5" />;
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'default';
-      case 'shipped':
-        return 'secondary';
-      case 'processing':
-        return 'outline';
-      default:
-        return 'destructive';
-    }
-  };
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">My Orders</h1>
-          <p className="text-muted-foreground mt-1">Track and manage your medicine orders</p>
-        </div>
+        <h1 className="text-3xl font-bold mb-6">My Orders</h1>
 
         {loading ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Package className="w-12 h-12 mx-auto text-muted-foreground mb-3 animate-pulse" />
-              <p className="text-muted-foreground">Loading orders...</p>
-            </CardContent>
-          </Card>
+          <p className="text-muted-foreground">Loading…</p>
         ) : orders.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Package className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
-              <h2 className="text-xl font-semibold mb-2">No orders yet</h2>
-              <p className="text-muted-foreground">Your order history will appear here</p>
-            </CardContent>
-          </Card>
+          <p className="text-muted-foreground">No orders yet.</p>
         ) : (
           <div className="space-y-4">
             {orders.map((order) => (
-              <Card key={order._id}>
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-start mb-4">
+              <Card key={order._id || order.id}>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
                     <div>
-                      <h3 className="font-semibold text-lg">Order #{order._id?.slice(-6)}</h3>
-                      <p className="text-sm text-muted-foreground">
-                        {new Date(order.createdAt).toLocaleDateString('en-IN', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric'
-                        })}
-                      </p>
-                    </div>
-                    <Badge variant={getStatusColor(order.orderStatus)}>
-                      <span className="flex items-center gap-1.5">
-                        {getStatusIcon(order.orderStatus)}
-                        {order.orderStatus}
-                      </span>
-                    </Badge>
-                  </div>
-
-                  <div className="space-y-2 mb-4">
-                    {order.items?.map((item: any, idx: number) => (
-                      <div key={idx} className="flex justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          {item.name} x {item.quantity}
-                        </span>
-                        <span className="font-medium">₹{item.price * item.quantity}</span>
+                      <div className="font-semibold">
+                        Order #{order._id || order.id}
                       </div>
-                    ))}
-                  </div>
-
-                  <div className="border-t pt-4 flex justify-between items-center">
-                    <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">Payment Status</p>
-                      <Badge variant={order.paymentStatus === 'paid' ? 'default' : 'destructive'}>
-                        {order.paymentStatus}
-                      </Badge>
+                      <div className="text-sm text-muted-foreground">
+                        {new Date(order.createdAt || order.date).toLocaleString()}
+                      </div>
+                      {order.shippingAddress && (
+                        <div className="text-sm text-muted-foreground mt-1">
+                          Ship to: {order.shippingAddress.line1}
+                          {order.shippingAddress.line2 ? `, ${order.shippingAddress.line2}` : ''}
+                          , {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zip}
+                        </div>
+                      )}
+                      <div className="text-sm">
+                        Items:{' '}
+                        {order.items?.reduce(
+                          (a: number, i: any) => a + (i.quantity || 0),
+                          0
+                        ) ?? 0}
+                      </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-muted-foreground">Total Amount</p>
-                      <p className="text-2xl font-bold text-primary">₹{order.total}</p>
+                      <div className="font-semibold">₹{order.total ?? order.amount ?? 0}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {order.status ?? 'placed'}
+                      </div>
                     </div>
                   </div>
+
+                  {/* items preview */}
+                  {Array.isArray(order.items) && order.items.length > 0 && (
+                    <div className="mt-3 text-sm text-muted-foreground space-y-1">
+                      {order.items.map((it: any) => (
+                        <div key={(it.product?._id) || it.product || it.name}>
+                          {it.name ?? 'Item'} × {it.quantity} — ₹{(it.price || 0) * (it.quantity || 0)}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             ))}
