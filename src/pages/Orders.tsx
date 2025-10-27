@@ -57,7 +57,13 @@ const Orders = () => {
       <main className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-8">My Orders</h1>
 
-        {orders.length === 0 ? (
+          {loading ? (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <p className="text-muted-foreground">Loading orders...</p>
+              </CardContent>
+            </Card>
+          ) : orders.length === 0 ? (
           <Card>
             <CardContent className="p-12 text-center">
               <Package className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
@@ -65,10 +71,10 @@ const Orders = () => {
               <p className="text-muted-foreground">Your order history will appear here</p>
             </CardContent>
           </Card>
-        ) : (
-          <div className="space-y-4">
-            {orders.map((order) => (
-              <Card key={order.id}>
+          ) : (
+            <div className="space-y-4">
+              {orders.map((order) => (
+                <Card key={order._id}>
                 <CardHeader>
                   <div className="flex justify-between items-start">
                     <div>

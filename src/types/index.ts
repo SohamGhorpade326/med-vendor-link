@@ -35,8 +35,10 @@ export interface CustomerProfile {
 
 export interface Product {
   id: string;
-  vendorId: string;
-  vendorName: string;
+  _id?: string;
+  vendor?: any;
+  vendorId?: string;
+  vendorName?: string;
   name: string;
   brand: string;
   composition: string;

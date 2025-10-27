@@ -4,6 +4,7 @@ import { mockVendor, mockCustomer, mockVendorProfile, mockCustomerProfile } from
 
 interface AuthContextType {
   user: User | null;
+  profile: VendorProfile | CustomerProfile | null;
   vendorProfile: VendorProfile | null;
   customerProfile: CustomerProfile | null;
   login: (email: string, password: string) => Promise<void>;
@@ -64,8 +65,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.removeItem('medihub_user');
   };
 
+  const profile = vendorProfile || customerProfile;
+
   return (
-    <AuthContext.Provider value={{ user, vendorProfile, customerProfile, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, profile, vendorProfile, customerProfile, login, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );

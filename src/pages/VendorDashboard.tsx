@@ -1,6 +1,7 @@
-import { useState } from 'react';
-import { mockProducts } from '@/lib/mockData';
+import { useState, useEffect } from 'react';
 import { Product } from '@/types';
+import { productsAPI } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import Header from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,41 +14,87 @@ import { useToast } from '@/hooks/use-toast';
 import { Plus, Edit, Trash2, AlertTriangle, Package } from 'lucide-react';
 
 const VendorDashboard = () => {
-  const [products, setProducts] = useState<Product[]>(mockProducts);
+  const [products, setProducts] = useState<Product[]>([]);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { profile } = useAuth();
 
   const lowStockProducts = products.filter(p => p.quantity < p.lowStockThreshold && p.quantity > 0);
 
-  const handleQuickUpdate = (id: string, field: 'price' | 'quantity', value: number) => {
-    setProducts(prev =>
-      prev.map(p => (p.id === id ? { ...p, [field]: value } : p))
-    );
-    toast({
-      title: 'Updated',
-      description: `${field} updated successfully`,
-    });
+  const fetchProducts = async () => {
+    try {
+      const data = await productsAPI.getVendorProducts();
+      setProducts(data);
+    } catch (error) {
+      console.error('Failed to fetch products:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setProducts(prev => prev.filter(p => p.id !== id));
-    toast({
-      title: 'Product deleted',
-      description: 'Product has been removed',
-    });
+  useEffect(() => {
+    fetchProducts();
+  }, []);
+
+  const handleQuickUpdate = async (id: string, field: 'price' | 'quantity', value: number) => {
+    try {
+      await productsAPI.update(id, { [field]: value });
+      setProducts(prev =>
+        prev.map(p => ((p._id || p.id) === id ? { ...p, [field]: value } : p))
+      );
+      toast({
+        title: 'Updated',
+        description: `${field} updated successfully`,
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update product',
+        variant: 'destructive'
+      });
+    }
   };
 
-  const handleSaveProduct = (e: React.FormEvent) => {
+  const handleDelete = async (id: string) => {
+    try {
+      await productsAPI.delete(id);
+      setProducts(prev => prev.filter(p => (p._id || p.id) !== id));
+      toast({
+        title: 'Product deleted',
+        description: 'Product has been removed',
+      });
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to delete product',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleSaveProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingProduct) {
-      if (editingProduct.id) {
-        setProducts(prev => prev.map(p => (p.id === editingProduct.id ? editingProduct : p)));
-        toast({ title: 'Product updated' });
-      } else {
-        const newProduct = { ...editingProduct, id: `p${Date.now()}` };
-        setProducts(prev => [...prev, newProduct]);
-        toast({ title: 'Product added' });
+      try {
+        const productId = editingProduct._id || editingProduct.id;
+        if (productId) {
+          const updated = await productsAPI.update(productId, editingProduct);
+          setProducts(prev => prev.map(p => ((p._id || p.id) === productId ? updated : p)));
+          toast({ title: 'Product updated' });
+        } else {
+          const created = await productsAPI.create(editingProduct);
+          setProducts(prev => [...prev, created]);
+          toast({ title: 'Product added' });
+        }
+      } catch (error: any) {
+        toast({
+          title: 'Error',
+          description: error.response?.data?.error || 'Failed to save product',
+          variant: 'destructive'
+        });
+        return;
       }
     }
     setIsDialogOpen(false);
@@ -57,8 +104,6 @@ const VendorDashboard = () => {
   const openAddDialog = () => {
     setEditingProduct({
       id: '',
-      vendorId: 'vendor-1',
-      vendorName: 'MediCare Pharmacy',
       name: '',
       brand: '',
       composition: '',
@@ -69,7 +114,7 @@ const VendorDashboard = () => {
       requiresPrescription: false,
       imageUrl: '',
       lowStockThreshold: 10,
-    });
+    } as Product);
     setIsDialogOpen(true);
   };
 
@@ -104,11 +149,17 @@ const VendorDashboard = () => {
           </Card>
         )}
 
-        <div className="space-y-4">
-          {products.map((product) => {
-            const isLowStock = product.quantity < product.lowStockThreshold;
-            return (
-              <Card key={product.id} className={isLowStock && product.quantity > 0 ? 'border-warning' : ''}>
+        {loading ? (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Loading products...</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {products.map((product) => {
+              const isLowStock = product.quantity < product.lowStockThreshold;
+              const productId = product._id || product.id;
+              return (
+                <Card key={productId} className={isLowStock && product.quantity > 0 ? 'border-warning' : ''}>
                 <CardContent className="p-4">
                   <div className="flex gap-4">
                     <img
@@ -131,7 +182,7 @@ const VendorDashboard = () => {
                         <Input
                           type="number"
                           value={product.price}
-                          onChange={(e) => handleQuickUpdate(product.id, 'price', Number(e.target.value))}
+                          onChange={(e) => handleQuickUpdate(productId, 'price', Number(e.target.value))}
                           className="h-9"
                         />
                       </div>
@@ -142,7 +193,7 @@ const VendorDashboard = () => {
                           <Input
                             type="number"
                             value={product.quantity}
-                            onChange={(e) => handleQuickUpdate(product.id, 'quantity', Number(e.target.value))}
+                            onChange={(e) => handleQuickUpdate(productId, 'quantity', Number(e.target.value))}
                             className="h-9"
                           />
                           {isLowStock && product.quantity > 0 && (
@@ -175,7 +226,7 @@ const VendorDashboard = () => {
                         <Button
                           variant="outline"
                           size="icon"
-                          onClick={() => handleDelete(product.id)}
+                          onClick={() => handleDelete(productId)}
                         >
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>
@@ -187,6 +238,7 @@ const VendorDashboard = () => {
             );
           })}
         </div>
+        )}
       </main>
 
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
