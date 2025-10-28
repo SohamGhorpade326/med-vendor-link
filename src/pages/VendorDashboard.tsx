@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Product } from '@/types';
-import { productsAPI } from '@/lib/api';
-import { useAuth } from '@/contexts/AuthContext';
+import { getProducts, addProduct, updateProduct, deleteProduct } from '@/lib/mockData';
 import Header from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
@@ -22,27 +21,20 @@ const VendorDashboard = () => {
 
   const lowStockProducts = products.filter(p => p.quantity < p.lowStockThreshold && p.quantity > 0);
 
-  const fetchProducts = async () => {
-    try {
-      const data = await productsAPI.getVendorProducts();
-      setProducts(data);
-    } catch (error) {
-      console.error('Failed to fetch products:', error);
-    } finally {
-      setLoading(false);
-    }
+  const fetchProducts = () => {
+    const data = getProducts();
+    setProducts(data);
+    setLoading(false);
   };
 
   useEffect(() => {
     fetchProducts();
   }, []);
 
-  const handleQuickUpdate = async (id: string, field: 'price' | 'quantity', value: number) => {
+  const handleQuickUpdate = (id: string, field: 'price' | 'quantity', value: number) => {
     try {
-      await productsAPI.update(id, { [field]: value });
-      setProducts(prev =>
-        prev.map(p => ((p._id || p.id) === id ? { ...p, [field]: value } : p))
-      );
+      updateProduct(id, { [field]: value });
+      fetchProducts();
       toast({
         title: 'Updated',
         description: `${field} updated successfully`,
@@ -56,10 +48,10 @@ const VendorDashboard = () => {
     }
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = (id: string) => {
     try {
-      await productsAPI.delete(id);
-      setProducts(prev => prev.filter(p => (p._id || p.id) !== id));
+      deleteProduct(id);
+      fetchProducts();
       toast({
         title: 'Product deleted',
         description: 'Product has been removed',
@@ -73,24 +65,22 @@ const VendorDashboard = () => {
     }
   };
 
-  const handleSaveProduct = async (e: React.FormEvent) => {
+  const handleSaveProduct = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingProduct) {
       try {
-        const productId = editingProduct._id || editingProduct.id;
-        if (productId) {
-          const updated = await productsAPI.update(productId, editingProduct);
-          setProducts(prev => prev.map(p => ((p._id || p.id) === productId ? updated : p)));
+        if (editingProduct.id) {
+          updateProduct(editingProduct.id, editingProduct);
           toast({ title: 'Product updated' });
         } else {
-          const created = await productsAPI.create(editingProduct);
-          setProducts(prev => [...prev, created]);
+          addProduct(editingProduct);
           toast({ title: 'Product added' });
         }
+        fetchProducts();
       } catch (error: any) {
         toast({
           title: 'Error',
-          description: error.response?.data?.error || 'Failed to save product',
+          description: error.message || 'Failed to save product',
           variant: 'destructive'
         });
         return;
@@ -113,7 +103,7 @@ const VendorDashboard = () => {
       requiresPrescription: false,
       imageUrl: '',
       lowStockThreshold: 10,
-    } as Product);
+    });
     setIsDialogOpen(true);
   };
 
@@ -156,9 +146,8 @@ const VendorDashboard = () => {
           <div className="space-y-4">
             {products.map((product) => {
               const isLowStock = product.quantity < product.lowStockThreshold;
-              const productId = product._id || product.id;
               return (
-                <Card key={productId} className={isLowStock && product.quantity > 0 ? 'border-warning' : ''}>
+                <Card key={product.id} className={isLowStock && product.quantity > 0 ? 'border-warning' : ''}>
                 <CardContent className="p-4">
                   <div className="flex gap-4">
                     <img
@@ -181,7 +170,7 @@ const VendorDashboard = () => {
                         <Input
                           type="number"
                           value={product.price}
-                          onChange={(e) => handleQuickUpdate(productId, 'price', Number(e.target.value))}
+                          onChange={(e) => handleQuickUpdate(product.id, 'price', Number(e.target.value))}
                           className="h-9"
                         />
                       </div>
@@ -192,7 +181,7 @@ const VendorDashboard = () => {
                           <Input
                             type="number"
                             value={product.quantity}
-                            onChange={(e) => handleQuickUpdate(productId, 'quantity', Number(e.target.value))}
+                            onChange={(e) => handleQuickUpdate(product.id, 'quantity', Number(e.target.value))}
                             className="h-9"
                           />
                           {isLowStock && product.quantity > 0 && (
@@ -225,7 +214,7 @@ const VendorDashboard = () => {
                         <Button
                           variant="outline"
                           size="icon"
-                          onClick={() => handleDelete(productId)}
+                          onClick={() => handleDelete(product.id)}
                         >
                           <Trash2 className="w-4 h-4 text-destructive" />
                         </Button>

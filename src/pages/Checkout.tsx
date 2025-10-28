@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { CheckCircle, XCircle } from 'lucide-react';
-import { ordersAPI } from '@/lib/api';
+import { saveOrder, updateProduct, getProducts } from '@/lib/mockData';
 
 const Checkout = () => {
   const { items, subtotal, clearCart } = useCart();
@@ -57,38 +57,27 @@ const Checkout = () => {
     setShowPaymentModal(true);
   };
 
-  // Build payload exactly as backend expects
-  const buildOrderPayload = () => {
-    const vendorId = (items[0] as any)?.vendorId || (items[0] as any)?.vendor; // prefer vendorId
-
-    if (!vendorId) {
-      throw new Error(
-        'Missing vendor id on cart item. Ensure ProductCard adds vendorId from product.vendor when adding to cart.'
-      );
-    }
-
-    return {
-      vendor: vendorId,                 // ✅ top-level vendor
-      subtotal,                         // ✅ top-level numbers
-      taxes,
-      total,
-      items: items.map((it) => ({
-        product: it.productId,          // ✅ items[].product (ObjectId string)
+  const createOrder = () => {
+    return saveOrder({
+      customerId: user?.id || '',
+      vendorId: '1',
+      vendorName: 'PharmaCorp',
+      items: items.map(it => ({
+        productId: it.productId,
         name: it.name,
-        brand: (it as any).brand,       // ✅ items[].brand
+        brand: it.brand || '',
         price: it.price,
         quantity: it.quantity,
+        imageUrl: it.imageUrl || '',
       })),
-      shippingAddress: {
-        line1: address.line1,
-        line2: address.line2,
-        city: address.city,
-        state: address.state,
-        zip: address.zip,
-        label: address.label || 'Home',
-      },
-      requiresPrescription,
-    };
+      subtotal,
+      taxes,
+      total,
+      paymentStatus: 'paid' as const,
+      orderStatus: 'completed' as const,
+      shippingAddress: address,
+      createdAt: new Date(),
+    });
   };
 
   const simulatePayment = async () => {
@@ -104,9 +93,19 @@ const Checkout = () => {
         return;
       }
 
-      // create the order
-      const payload = buildOrderPayload();
-      await ordersAPI.create(payload);
+      // Create the order and update product quantities
+      createOrder();
+      
+      // Update product quantities in stock
+      const products = getProducts();
+      items.forEach(cartItem => {
+        const product = products.find(p => p.id === cartItem.productId);
+        if (product) {
+          updateProduct(product.id, {
+            quantity: Math.max(0, product.quantity - cartItem.quantity)
+          });
+        }
+      });
 
       await new Promise((r) => setTimeout(r, 600));
       clearCart();

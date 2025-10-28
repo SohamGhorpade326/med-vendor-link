@@ -1,54 +1,61 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { authAPI } from "@/lib/api";
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { User } from '@/types';
+import { mockUsers, initializeStorage } from '@/lib/mockData';
 
-interface AuthContextType {
-  user: any;
-  isLoading: boolean;
+type AuthContextType = {
+  user: User | null;
   login: (email: string, password: string) => Promise<void>;
   logout: () => void;
-}
+  isLoading: boolean;
+};
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export const useAuth = () => {
-  const ctx = useContext(AuthContext);
-  if (!ctx) throw new Error("useAuth must be used within AuthProvider");
-  return ctx;
-};
-
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // ✅ Restore login session
   useEffect(() => {
-    const token = localStorage.getItem("token");
-    const savedUser = localStorage.getItem("medihub_user");
-
-    if (token && savedUser) {
-      setUser(JSON.parse(savedUser));
+    // Initialize storage on mount
+    initializeStorage();
+    
+    // Check for stored user
+    const storedUser = localStorage.getItem('medihub_user');
+    if (storedUser) {
+      setUser(JSON.parse(storedUser));
     }
     setIsLoading(false);
   }, []);
 
-  // ✅ Login using backend API
   const login = async (email: string, password: string) => {
-    const data = await authAPI.login(email, password);
-    localStorage.setItem("token", data.token);
-    localStorage.setItem("medihub_user", JSON.stringify(data.user));
-    setUser(data.user);
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    const foundUser = mockUsers.find(u => u.email === email);
+    if (!foundUser) {
+      throw new Error('Invalid credentials');
+    }
+    
+    setUser(foundUser);
+    localStorage.setItem('medihub_user', JSON.stringify(foundUser));
   };
 
-  // ✅ Logout
   const logout = () => {
     setUser(null);
-    localStorage.removeItem("token");
-    localStorage.removeItem("medihub_user");
+    localStorage.removeItem('medihub_user');
   };
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, login, logout }}>
+    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
+};
+
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
 };

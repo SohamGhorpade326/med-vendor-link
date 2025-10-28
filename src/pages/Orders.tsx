@@ -1,85 +1,109 @@
-import { useEffect, useState } from 'react';
-import Header from '@/components/Header';
-import { Card, CardContent } from '@/components/ui/card';
-import { ordersAPI } from '@/lib/api';
+import { useState, useEffect } from 'react';
+import { Order } from '@/types';
+import { getOrders } from '@/lib/mockData';
 import { useAuth } from '@/contexts/AuthContext';
+import Header from '@/components/Header';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Package, Calendar, MapPin } from 'lucide-react';
 
 const Orders = () => {
-  const { user } = useAuth(); // <-- don't take customerProfile; use user?.profile if needed
-  const [orders, setOrders] = useState<any[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const fetchOrders = async () => {
-    try {
-      const data = await ordersAPI.getMy();
-      setOrders(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Failed to fetch orders:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { user } = useAuth();
 
   useEffect(() => {
-    fetchOrders();
-  }, []);
+    if (user?.role === 'customer') {
+      const data = getOrders();
+      setOrders(data);
+      setLoading(false);
+    }
+  }, [user]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <Header />
+        <main className="container mx-auto px-4 py-8">
+          <p className="text-center text-muted-foreground">Loading orders...</p>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
       <Header />
       <main className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-6">My Orders</h1>
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">My Orders</h1>
+          <p className="text-muted-foreground mt-1">Track and manage your orders</p>
+        </div>
 
-        {loading ? (
-          <p className="text-muted-foreground">Loading…</p>
-        ) : orders.length === 0 ? (
-          <p className="text-muted-foreground">No orders yet.</p>
+        {orders.length === 0 ? (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <Package className="w-16 h-16 mx-auto text-muted-foreground mb-4" />
+              <h3 className="text-xl font-semibold mb-2">No orders yet</h3>
+              <p className="text-muted-foreground">
+                Start shopping to see your orders here
+              </p>
+            </CardContent>
+          </Card>
         ) : (
           <div className="space-y-4">
             {orders.map((order) => (
-              <Card key={order._id || order.id}>
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
+              <Card key={order.id}>
+                <CardHeader>
+                  <div className="flex justify-between items-start">
                     <div>
-                      <div className="font-semibold">
-                        Order #{order._id || order.id}
-                      </div>
-                      <div className="text-sm text-muted-foreground">
-                        {new Date(order.createdAt || order.date).toLocaleString()}
-                      </div>
-                      {order.shippingAddress && (
-                        <div className="text-sm text-muted-foreground mt-1">
-                          Ship to: {order.shippingAddress.line1}
-                          {order.shippingAddress.line2 ? `, ${order.shippingAddress.line2}` : ''}
-                          , {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zip}
-                        </div>
-                      )}
-                      <div className="text-sm">
-                        Items:{' '}
-                        {order.items?.reduce(
-                          (a: number, i: any) => a + (i.quantity || 0),
-                          0
-                        ) ?? 0}
+                      <CardTitle className="text-lg">Order #{order.id}</CardTitle>
+                      <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                        <Calendar className="w-4 h-4" />
+                        <span>{new Date(order.createdAt).toLocaleDateString()}</span>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="font-semibold">₹{order.total ?? order.amount ?? 0}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {order.status ?? 'placed'}
-                      </div>
+                    <Badge
+                      variant={order.orderStatus === 'completed' ? 'default' : 'secondary'}
+                      className="capitalize"
+                    >
+                      {order.orderStatus}
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-start gap-2">
+                    <MapPin className="w-4 h-4 mt-1 text-muted-foreground" />
+                    <div className="text-sm">
+                      <p className="font-medium">Shipping Address</p>
+                      <p className="text-muted-foreground">
+                        {order.shippingAddress.line1}
+                        {order.shippingAddress.line2 && `, ${order.shippingAddress.line2}`}
+                      </p>
+                      <p className="text-muted-foreground">
+                        {order.shippingAddress.city}, {order.shippingAddress.state} {order.shippingAddress.zip}
+                      </p>
                     </div>
                   </div>
 
-                  {/* items preview */}
-                  {Array.isArray(order.items) && order.items.length > 0 && (
-                    <div className="mt-3 text-sm text-muted-foreground space-y-1">
-                      {order.items.map((it: any) => (
-                        <div key={(it.product?._id) || it.product || it.name}>
-                          {it.name ?? 'Item'} × {it.quantity} — ₹{(it.price || 0) * (it.quantity || 0)}
+                  <div className="border-t pt-4">
+                    <p className="font-medium mb-2">Order Items ({order.items.length})</p>
+                    <div className="space-y-2">
+                      {order.items.map((item, idx) => (
+                        <div key={idx} className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">
+                            {item.name} x {item.quantity}
+                          </span>
+                          <span className="font-medium">₹{item.price * item.quantity}</span>
                         </div>
                       ))}
                     </div>
-                  )}
+                  </div>
+
+                  <div className="border-t pt-4 flex justify-between items-center">
+                    <span className="font-semibold">Total</span>
+                    <span className="text-xl font-bold text-primary">₹{order.total.toFixed(2)}</span>
+                  </div>
                 </CardContent>
               </Card>
             ))}
