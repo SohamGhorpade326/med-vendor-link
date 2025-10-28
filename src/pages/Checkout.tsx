@@ -96,7 +96,7 @@ const Checkout = () => {
       setIsProcessing(true);
       // payment simulation
       await new Promise((r) => setTimeout(r, 1100));
-      const success = Math.random() > 0.2; // 80% success
+      const success = true; // Always succeed for demo
       setPaymentSuccess(success);
 
       if (!success) {

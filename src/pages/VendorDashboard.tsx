@@ -19,7 +19,6 @@ const VendorDashboard = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
-  const { profile } = useAuth();
 
   const lowStockProducts = products.filter(p => p.quantity < p.lowStockThreshold && p.quantity > 0);
 
